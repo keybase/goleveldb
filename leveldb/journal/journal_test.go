@@ -19,6 +19,8 @@ import (
 	"math/rand"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type dropper struct {
@@ -171,9 +173,13 @@ func TestFlush(t *testing.T) {
 	// Write a couple of records. Everything should still be held
 	// in the record.Writer buffer, so that buf.Len should be 0.
 	w0, _ := w.Next()
-	w0.Write([]byte("0"))
+	if _, err := w0.Write([]byte("0")); err != nil {
+		t.Fatal(err)
+	}
 	w1, _ := w.Next()
-	w1.Write([]byte("11"))
+	if _, err := w1.Write([]byte("11")); err != nil {
+		t.Fatal(err)
+	}
 	if got, want := buf.Len(), 0; got != want {
 		t.Fatalf("buffer length #0: got %d want %d", got, want)
 	}
@@ -188,7 +194,9 @@ func TestFlush(t *testing.T) {
 	// Do another write, one that isn't large enough to complete the block.
 	// The write should not have flowed through to buf.
 	w2, _ := w.Next()
-	w2.Write(bytes.Repeat([]byte("2"), 10000))
+	if _, err := w2.Write(bytes.Repeat([]byte("2"), 10000)); err != nil {
+		t.Fatal(err)
+	}
 	if got, want := buf.Len(), 17; got != want {
 		t.Fatalf("buffer length #2: got %d want %d", got, want)
 	}
@@ -204,7 +212,9 @@ func TestFlush(t *testing.T) {
 	// We should now have 32768 bytes (a complete block), without
 	// an explicit flush.
 	w3, _ := w.Next()
-	w3.Write(bytes.Repeat([]byte("3"), 40000))
+	if _, err := w3.Write(bytes.Repeat([]byte("3"), 40000)); err != nil {
+		t.Fatal(err)
+	}
 	if got, want := buf.Len(), 32768; got != want {
 		t.Fatalf("buffer length #4: got %d want %d", got, want)
 	}
@@ -243,7 +253,9 @@ func TestNonExhaustiveRead(t *testing.T) {
 		length := len(p) + rnd.Intn(3*blockSize)
 		s := string(uint8(i)) + "123456789abcdefgh"
 		ww, _ := w.Next()
-		ww.Write([]byte(big(s, length)))
+		if _, err := ww.Write([]byte(big(s, length))); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
@@ -271,12 +283,16 @@ func TestStaleReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w0.Write([]byte("0"))
+	if _, err := w0.Write([]byte("0")); err != nil {
+		t.Fatal(err)
+	}
 	w1, err := w.Next()
 	if err != nil {
 		t.Fatal(err)
 	}
-	w1.Write([]byte("11"))
+	if _, err := w1.Write([]byte("11")); err != nil {
+		t.Fatal(err)
+	}
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -328,6 +344,28 @@ func TestStaleWriter(t *testing.T) {
 	}
 }
 
+func TestSize(t *testing.T) {
+	var buf bytes.Buffer
+	zeroes := make([]byte, 8<<10)
+	w := NewWriter(&buf)
+	for i := 0; i < 100; i++ {
+		writer, err := w.Next()
+		require.NoError(t, err)
+
+		for j := 0; j < rand.Intn(10); j++ {
+			n := rand.Intn(len(zeroes))
+			_, err = writer.Write(zeroes[:n])
+			require.NoError(t, err)
+		}
+
+		require.NoError(t, w.Flush())
+		if buf.Len() != int(w.Size()) {
+			t.Fatalf("expected %d, but found %d", buf.Len(), w.Size())
+		}
+	}
+	require.NoError(t, w.Close())
+}
+
 func TestCorrupt_MissingLastBlock(t *testing.T) {
 	buf := new(bytes.Buffer)
 
@@ -377,7 +415,7 @@ func TestCorrupt_MissingLastBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n, err = io.Copy(ioutil.Discard, rr)
+	_, err = io.Copy(ioutil.Discard, rr)
 	if err != io.ErrUnexpectedEOF {
 		t.Fatalf("read #1: unexpected error: %v", err)
 	}
@@ -542,7 +580,7 @@ func TestCorrupt_CorruptedMiddleBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n, err = io.Copy(ioutil.Discard, rr)
+	_, err = io.Copy(ioutil.Discard, rr)
 	if err != io.ErrUnexpectedEOF {
 		t.Fatalf("read #1: unexpected error: %v", err)
 	}
@@ -662,7 +700,7 @@ func TestCorrupt_CorruptedLastBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n, err = io.Copy(ioutil.Discard, rr)
+	_, err = io.Copy(ioutil.Discard, rr)
 	if err != io.ErrUnexpectedEOF {
 		t.Fatalf("read #3: unexpected error: %v", err)
 	}
@@ -733,7 +771,7 @@ func TestCorrupt_FirstChuckLengthOverflow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n, err = io.Copy(ioutil.Discard, rr)
+	_, err = io.Copy(ioutil.Discard, rr)
 	if err != io.ErrUnexpectedEOF {
 		t.Fatalf("read #1: unexpected error: %v", err)
 	}
