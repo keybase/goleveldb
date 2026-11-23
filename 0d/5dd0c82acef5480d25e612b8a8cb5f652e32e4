@@ -1,0 +1,22 @@
+leveldb/db_write.go
+  s_27022dbf43f3ce::t_59da413e23fd7a 420
+leveldb/db_flush_test.go
+  s_27022dbf43f3ce::t_e7995b1e1e9ac0 166-182
+  s_27022dbf43f3ce::t_9c78a43662af4c 10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "0d5dd0c82acef5480d25e612b8a8cb5f652e32e4",
+  "prompts": {},
+  "sessions": {
+    "s_27022dbf43f3ce": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "41beaa8e-5383-4ca0-8c97-6d8162e96c12",
+        "model": "auto-smart"
+      },
+      "human_author": "Joshua Blum <joshua.blum@zoom.us>"
+    }
+  }
+}
