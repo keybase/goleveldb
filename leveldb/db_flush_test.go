@@ -7,6 +7,7 @@ import (
 
 	"github.com/syndtr/goleveldb/leveldb/storage"
 	"github.com/syndtr/goleveldb/leveldb/testutil"
+	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 func tablesPerLevel(h *dbHarness) []int {
@@ -161,4 +162,21 @@ func TestDB_OpenTransactionErrorReleasesWriteLock(t *testing.T) {
 		t.Fatal("OpenTransaction: got error: ", err)
 	}
 	tr.Discard()
+}
+
+func TestDB_CompactRangeErrorReleasesWriteLock(t *testing.T) {
+	h := newDbHarness(t)
+	defer closeUnlessFailed(t, h)
+
+	h.put("a", "v")
+	h.stor.EmulateError(testutil.ModeCreate, storage.TypeJournal, errors.New("no space left on device"))
+	if err := h.db.CompactRange(util.Range{}); err == nil {
+		t.Fatal("CompactRange: expected an error")
+	}
+	h.stor.EmulateError(testutil.ModeCreate, storage.TypeJournal, nil)
+
+	putWithin(t, h, "b")
+	if err := h.db.CompactRange(util.Range{}); err != nil {
+		t.Fatal("CompactRange: got error: ", err)
+	}
 }

@@ -417,6 +417,7 @@ func (db *DB) CompactRange(r util.Range) error {
 	// Check for overlaps in memdb.
 	mdb := db.getEffectiveMem()
 	if mdb == nil {
+		<-db.writeLockC
 		return ErrClosed
 	}
 	defer mdb.decref()
