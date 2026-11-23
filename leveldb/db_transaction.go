@@ -315,12 +315,14 @@ func (db *DB) OpenTransaction() (*Transaction, error) {
 	// Flush current memdb.
 	if db.mem != nil && db.mem.Len() != 0 {
 		if _, err := db.rotateMem(0, true); err != nil {
+			<-db.writeLockC
 			return nil, err
 		}
 	}
 
 	// Wait compaction when certain threshold reached.
 	if err := db.waitCompaction(); err != nil {
+		<-db.writeLockC
 		return nil, err
 	}
 

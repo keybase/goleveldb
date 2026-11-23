@@ -417,6 +417,7 @@ func (db *DB) CompactRange(r util.Range) error {
 	// Check for overlaps in memdb.
 	mdb := db.getEffectiveMem()
 	if mdb == nil {
+		<-db.writeLockC
 		return ErrClosed
 	}
 	defer mdb.decref()
@@ -436,6 +437,43 @@ func (db *DB) CompactRange(r util.Range) error {
 
 	// Table compaction.
 	return db.compTriggerRange(db.tcompCmdC, -1, r.Start, r.Limit)
+}
+
+// FlushMemdb writes the current memdb to a table and starts a new journal,
+// without compacting any tables. It returns once every write made before the
+// call is in a table. Writers are blocked only while the memdb is swapped,
+// not while it is written.
+func (db *DB) FlushMemdb() error {
+	if err := db.ok(); err != nil {
+		return err
+	}
+
+	// Lock writer.
+	select {
+	case db.writeLockC <- struct{}{}:
+	case err := <-db.compPerErrC:
+		return err
+	case <-db.closeC:
+		return ErrClosed
+	}
+
+	mdb := db.getEffectiveMem()
+	if mdb == nil {
+		<-db.writeLockC
+		return ErrClosed
+	}
+	empty := mdb.Len() == 0
+	mdb.decref()
+	if !empty {
+		if _, err := db.rotateMem(0, false); err != nil {
+			<-db.writeLockC
+			return err
+		}
+	}
+	<-db.writeLockC
+
+	// Wait for the memdb rotated above, or one a write rotated earlier.
+	return db.compTriggerWait(db.mcompCmdC)
 }
 
 // SetReadOnly makes DB read-only. It will stay read-only until reopened.
